@@ -3,6 +3,7 @@ import os
 import time
 from hoshino import Service
 from hoshino.typing import *
+from nonebot import CommandSession
 import requests
 import traceback
 from io import BytesIO
