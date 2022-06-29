@@ -13,9 +13,7 @@ sv = Service('r6s战绩查询')
 file_path = os.path.dirname(__file__)
 font_bold = os.path.join(file_path, "ScoutCond-BoldItalic.otf")
 font_regular = os.path.join(file_path, "ScoutCond-RegularItalic.otf")
-mmr_level = {'COPPER ': '紫铜', 'BRONZE ': '青铜', 'SILVER ': '白银', 'GOLD ': '黄金', 'PLATINUM ': '白金',
-            'DIAMOND ': '钻石',
-            'CHAMPIONS ': '冠军'}
+mmr_level = {'COPPER ': '紫铜', 'BRONZE ': '青铜', 'SILVER ': '白银', 'GOLD ': '黄金', 'PLATINUM ': '白金', 'DIAMOND ': '钻石', 'CHAMPIONS ': '冠军'}
 
 
 @sv.on_command('R6', aliases='r6')
@@ -58,7 +56,7 @@ async def r6(session: CommandSession):
         try:
             avatar = Image.open(BytesIO(requests.get(data['avatar'], timeout=10).content)).resize((150, 150))
         except requests.exceptions.ReadTimeout:
-            if os.path.exists(f'{file_path}cache/{data["name"]}.png')
+            if os.path.exists(f'{file_path}cache/{data["name"]}.png'):
                 avatar = Image.open(f'{file_path}cache/{data["name"]}.png')
             else:
                 avatar = Image.open(f'{file_path}default_avatar.png')
