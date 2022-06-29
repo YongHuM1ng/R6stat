@@ -5,7 +5,6 @@ from hoshino import Service
 from hoshino.typing import *
 from nonebot import CommandSession
 import requests
-import traceback
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
@@ -14,7 +13,7 @@ sv = Service('r6s战绩查询')
 file_path = os.path.dirname(__file__)
 font_bold = os.path.join(file_path, "ScoutCond-BoldItalic.otf")
 font_regular = os.path.join(file_path, "ScoutCond-RegularItalic.otf")
-mmrlevel = {'COPPER ': '紫铜', 'BRONZE ': '青铜', 'SILVER ': '白银', 'GOLD ': '黄金', 'PLATINUM ': '白金',
+mmr_level = {'COPPER ': '紫铜', 'BRONZE ': '青铜', 'SILVER ': '白银', 'GOLD ': '黄金', 'PLATINUM ': '白金',
             'DIAMOND ': '钻石',
             'CHAMPIONS ': '冠军'}
 
@@ -24,19 +23,22 @@ async def r6(session: CommandSession):
     msg = session.ctx['raw_message']
     if msg == 'R6':
         name = session.ctx['sender']['card']
-        isimg = True
+        is_img = True
     elif msg[:3] == 'R6 ':
         name = msg[3:]
-        isimg = True
+        is_img = True
     elif msg == 'r6':
         name = session.ctx['sender']['card']
-        isimg = False
+        is_img = False
     elif msg[:3] == 'r6 ':
         name = msg[3:]
-        isimg = False
+        is_img = False
     else:
         return
-    r = requests.get('https://r6.tracker.network/api/v0/overwolf/player', params={'name': name}, timeout=10)
+    try:
+        r = requests.get('https://r6.tracker.network/api/v0/overwolf/player', params={'name': name}, timeout=10)
+    except requests.exceptions.ReadTimeout:
+        session.finish('连接R6Tracker服务器超时')
     r.encoding = 'utf-8'
     data = r.json()
     if not data['success']:
@@ -44,7 +46,7 @@ async def r6(session: CommandSession):
             await session.finish('没有这个游戏ID', at_sender=True)
             return
         await session.finish('出现错误，错误原因：%s' % data['reason'], at_sender=True)
-    if isimg:
+    if is_img:
         for i in range(len(data['seasons'])):
             if data['seasons'][i]['season'] == data['currentSeason']:
                 if data['seasons'][i]['regionLabel'] == 'CASUAL':
@@ -53,11 +55,20 @@ async def r6(session: CommandSession):
                 if data['seasons'][i]['regionLabel'] == 'RANKED':
                     season2 = data['seasons'][i]
 
-        avatar = Image.open(BytesIO(requests.get(data['avatar']).content)).resize((150, 150))
-        casualimg = Image.open(BytesIO(requests.get(season1['img']).content))
-        rankimg = Image.open(BytesIO(requests.get(season2['img']).content)).convert('RGBA')
+        try:
+            avatar = Image.open(BytesIO(requests.get(data['avatar'], timeout=10).content)).resize((150, 150))
+        except requests.exceptions.ReadTimeout:
+            if os.path.exists(f'{file_path}cache/{data["name"]}.png')
+                avatar = Image.open(f'{file_path}cache/{data["name"]}.png')
+            else:
+                avatar = Image.open(f'{file_path}default_avatar.png')
+        else:
+            avatar.save(f'{file_path}cache/{data["name"]}.png')
 
-        back = Image.open(os.path.join(file_path, "back.png"))
+        casual_img = Image.open(BytesIO(requests.get(season1['img'], timeout=10).content))
+        rank_img = Image.open(BytesIO(requests.get(season2['img'], timeout=10).content)).convert('RGBA')
+
+        back = Image.open(f'{file_path}back.png')
         draw = ImageDraw.Draw(back)
 
         draw.text((515, 105), f'SEASON{data["currentSeason"]}', fill="#FFFFFF",
@@ -67,7 +78,7 @@ async def r6(session: CommandSession):
                   font=ImageFont.truetype(font_regular, size=36))
         draw.text((256, 230), data['name'], fill="#FFFFFF", font=ImageFont.truetype(font_regular, size=96))
 
-        back.paste(casualimg, (125, 412), mask=casualimg)
+        back.paste(casual_img, (125, 412), mask=casual_img)
         draw.text((181 - ImageFont.truetype(font_bold, size=16).getsize(season1['rankName'])[0] / 2, 518),
                   season1['rankName'], fill="#FFFFFF", font=ImageFont.truetype(font_bold, size=16))
         draw.text((181 - ImageFont.truetype(font_bold, size=48).getsize(str(season1['mmr']))[0] / 2, 530),
@@ -87,7 +98,7 @@ async def r6(session: CommandSession):
                                                                                                                'winPct'] != 0 else '0',
                   fill="#FFFFFF", font=ImageFont.truetype(font_regular, size=48))
 
-        back.paste(rankimg, (125, 676), mask=rankimg)
+        back.paste(rank_img, (125, 676), mask=rank_img)
         draw.text((181 - ImageFont.truetype(font_bold, size=16).getsize(season2['rankName'])[0] / 2, 782),
                   season2['rankName'], fill="#FFFFFF", font=ImageFont.truetype(font_bold, size=16))
         draw.text((181 - ImageFont.truetype(font_bold, size=48).getsize(str(season2['mmr']))[0] / 2, 794),
@@ -114,18 +125,17 @@ async def r6(session: CommandSession):
 
         draw.text((629, 925), time.strftime("%Y-%m-%d %H:%M", time.localtime()), fill="#FFFFFF",
                   font=ImageFont.truetype(font_regular, size=24))
-
         bio = BytesIO()
         back.save(bio, format='PNG')
-        cqimg = f'[CQ:image,file=base64://{base64.b64encode(bio.getvalue()).decode()}]'
-        await session.finish(cqimg)
+        cq_img = f'[CQ:image,file=base64://{base64.b64encode(bio.getvalue()).decode()}]'
+        await session.finish(cq_img)
     else:
         for i in range(len(data['seasons'])):
             if data['seasons'][i]['season'] == data['currentSeason']:
                 if data['seasons'][i]['regionLabel'] == 'CASUAL':
                     season = data['seasons'][i]
-        for i in mmrlevel:
-            season['rankName'] = season['rankName'].replace(i, mmrlevel[i])
+        for i in mmr_level:
+            season['rankName'] = season['rankName'].replace(i, mmr_level[i])
         await session.finish(
                        f'[CQ:image,file={data["avatar"]}]\n'
                        f'{data["name"]}  等级:{data["level"]}\n'
