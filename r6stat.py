@@ -10,9 +10,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 sv = Service('r6s战绩查询')
 
-file_path = os.path.dirname(__file__)
-font_bold = os.path.join(file_path, "ScoutCond-BoldItalic.otf")
-font_regular = os.path.join(file_path, "ScoutCond-RegularItalic.otf")
+file_path = os.path.dirname(__file__) + '/'
+font_bold = f'{file_path}ScoutCond-BoldItalic.otf'
+font_regular = f'{file_path}ScoutCond-RegularItalic.otf'
 mmr_level = {'COPPER ': '紫铜', 'BRONZE ': '青铜', 'SILVER ': '白银', 'GOLD ': '黄金', 'PLATINUM ': '白金', 'DIAMOND ': '钻石', 'CHAMPIONS ': '冠军'}
 
 
@@ -53,15 +53,27 @@ async def r6(session: CommandSession):
                 if data['seasons'][i]['regionLabel'] == 'RANKED':
                     season2 = data['seasons'][i]
 
-        try:
-            avatar = Image.open(BytesIO(requests.get(data['avatar'], timeout=10).content)).resize((150, 150))
-        except requests.exceptions.ReadTimeout:
-            if os.path.exists(f'{file_path}cache/{data["name"]}.png'):
-                avatar = Image.open(f'{file_path}cache/{data["name"]}.png')
-            else:
-                avatar = Image.open(f'{file_path}default_avatar.png')
+        # 优先获取远程头像
+        # try:
+        #     avatar = Image.open(BytesIO(requests.get(data['avatar'], timeout=10).content)).resize((150, 150))
+        # except requests.exceptions.ReadTimeout:
+        #     if os.path.exists(f'{file_path}cache/{data["name"]}.png'):
+        #         avatar = Image.open(f'{file_path}cache/{data["name"]}.png')
+        #     else:
+        #         avatar = Image.open(f'{file_path}default_avatar.png')
+        # else:
+        #     avatar.save(f'{file_path}cache/{data["name"]}.png')
+
+        # 优先获取本地头像
+        if os.path.exists(f'{file_path}cache/{data["name"]}.png'):
+            avatar = Image.open(f'{file_path}cache/{data["name"]}.png')
         else:
-            avatar.save(f'{file_path}cache/{data["name"]}.png')
+            try:
+                avatar = Image.open(BytesIO(requests.get(data['avatar'], timeout=10).content)).resize((150, 150))
+            except requests.exceptions.ReadTimeout:
+                avatar = Image.open(f'{file_path}default_avatar.png')
+            else:
+                avatar.save(f'{file_path}cache/{data["name"]}.png')
 
         casual_img = Image.open(BytesIO(requests.get(season1['img'], timeout=10).content))
         rank_img = Image.open(BytesIO(requests.get(season2['img'], timeout=10).content)).convert('RGBA')
